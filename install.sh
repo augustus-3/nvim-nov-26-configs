@@ -44,29 +44,52 @@ pacman_packages=(
   ttf-jetbrains-mono-nerd
 )
 
+# Not in the official repos, so these go through an AUR helper. tdf is the
+# terminal PDF viewer texide opens in its tmux pane.
+aur_packages=(tdf)
+aur_helper=""
+
 install_packages() {
   if ! have pacman; then
     say "Not an Arch system — skipping packages."
-    printf 'Install these by hand: %s\n' "${pacman_packages[*]}"
+    printf 'Install these by hand: %s %s\n' \
+      "${pacman_packages[*]}" "${aur_packages[*]}"
     return
   fi
 
   say "Installing system packages"
   sudo pacman -S --needed --noconfirm "${pacman_packages[@]}"
 
-  # tdf is the terminal PDF viewer texide opens in its tmux pane. It lives in
-  # the AUR, so it needs a helper; skip rather than fail if there is none.
-  if have tdf; then
-    return
-  fi
+  install_aur_packages
+}
+
+# yay is not in the official repos, so it has to be bootstrapped the manual
+# way: clone the package, build it, install it. yay-bin ships a prebuilt
+# binary, which saves pulling in Go just to compile the thing that installs
+# everything else. makepkg refuses to run as root, so there is no sudo here —
+# it asks for the password itself at the install step.
+ensure_aur_helper() {
+  local helper
   for helper in paru yay; do
     if have "$helper"; then
-      say "Installing tdf from the AUR with $helper"
-      "$helper" -S --needed --noconfirm tdf
+      aur_helper="$helper"
       return
     fi
   done
-  say "No AUR helper found — install 'tdf' yourself for the LaTeX PDF pane."
+
+  say "Bootstrapping yay from the AUR"
+  local build_dir
+  build_dir="$(mktemp -d)"
+  git clone --depth 1 https://aur.archlinux.org/yay-bin.git "$build_dir/yay-bin"
+  (cd "$build_dir/yay-bin" && makepkg -si --needed --noconfirm)
+  rm -rf "$build_dir"
+  aur_helper=yay
+}
+
+install_aur_packages() {
+  say "Installing AUR packages"
+  ensure_aur_helper
+  "$aur_helper" -S --needed --noconfirm "${aur_packages[@]}"
 }
 
 # ------------------------------------------------------------------ backup --

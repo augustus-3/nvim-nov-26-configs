@@ -40,8 +40,9 @@ and does the rest.
   directories; the notes themselves are yours to copy or sync separately.
 - **A Nerd Font**, selected in the terminal emulator, not here. The install
   script pulls `ttf-jetbrains-mono-nerd`.
-- **`tdf`**, the terminal PDF viewer `texide` opens. AUR package, so the script
-  only installs it if `paru` or `yay` is present.
+- **`tdf`**, the terminal PDF viewer `texide` opens. AUR package — the script
+  installs it through `paru` or `yay`, bootstrapping `yay-bin` from the AUR
+  first if neither is there.
 - **`R_AUTO_START=true`** — set this env var to have R.nvim start the console
   and object browser on startup. Unset, R stays manual.
 
