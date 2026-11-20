@@ -30,10 +30,8 @@ and does the rest.
 | `lua/plugins/org-mode.lua` | orgmode, plus Emacs-style entity and sub/superscript concealing |
 | `lua/plugins/org-roam.lua` | org-roam, plus `<leader>ng` to render the graph in a browser |
 | `lua/plugins/R-nvim.lua` | R.nvim; `<Enter>` sends a line or selection to the console |
-| `lua/plugins/jupynium.lua` | Jupyter notebooks as `.ju.py` text, synced into Firefox |
 | `lua/plugins/smear_cursor.lua` | smear-cursor |
 | `bin/texide` | tmux LaTeX workspace: editor pane left, `tdf` PDF pane right |
-| `bin/jupynium-venv` | builds the Python venv Jupynium drives; run by its `build` step |
 
 ## Things that live outside this repo
 
@@ -47,29 +45,6 @@ and does the rest.
   first if neither is there.
 - **`R_AUTO_START=true`** — set this env var to have R.nvim start the console
   and object browser on startup. Unset, R stays manual.
-- **`~/.virtualenvs/jupynium`** — the Python environment Jupynium runs in,
-  built by `bin/jupynium-venv` during the plugin's install. Rebuild it any time
-  with `:Lazy build jupynium.nvim`, or repair just the Jupyter side by running
-  `jupynium-venv` with no arguments. Override the location with
-  `JUPYNIUM_VENV`.
-
-## Notebooks
-
-Open a `.ju.py` file and Jupynium starts its server, opens Firefox at
-`localhost:8888/nbclassic` and begins syncing. Cells are `# %%` markers; the
-`.ipynb` is written out on save.
-
-| Key | Does |
-| --- | --- |
-| `<localleader>x` | Execute the current cell (or the selected ones) |
-| `<localleader>c` | Clear those cells' outputs |
-| `<localleader>k` | Inspect the variable under the cursor |
-| `<localleader>jc` / `<localleader>jo` | Scroll the browser to the cell / its output |
-| `<localleader>js` | Start syncing, if it was not automatic |
-| `<PageUp>` / `<PageDown>` | Scroll the browser |
-
-Sync runs one way, Neovim to browser. Edits made in the browser do not come
-back and will desync the two — treat the browser as output only.
 
 ## Updating plugins
 

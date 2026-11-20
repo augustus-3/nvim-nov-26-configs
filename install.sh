@@ -40,10 +40,6 @@ pacman_packages=(
   # lua/plugins/R-nvim.lua
   r
 
-  # lua/plugins/jupynium.lua — Selenium drives Firefox through geckodriver,
-  # and bin/jupynium-venv builds the notebook venv with uv
-  firefox geckodriver uv
-
   # the dashboard and statusline use Nerd Font glyphs
   ttf-jetbrains-mono-nerd
 )
@@ -119,10 +115,7 @@ backup_existing_state() {
 link_helpers() {
   say "Linking helper scripts into $bin_dir"
   mkdir -p "$bin_dir"
-  local script
-  for script in "$repo"/bin/*; do
-    ln -sfn "$script" "$bin_dir/$(basename "$script")"
-  done
+  ln -sfn "$repo/bin/texide" "$bin_dir/texide"
 
   case ":$PATH:" in
     *":$bin_dir:"*) ;;
@@ -145,9 +138,6 @@ create_org_dirs() {
 # `Lazy! restore` installs the exact commits in lazy-lock.json, rather than
 # whatever is at HEAD today — the point of committing the lockfile.
 install_plugins() {
-  # jupynium.nvim's build step runs bin/jupynium-venv, which needs uv.
-  have uv || say "Warning: uv is not installed — jupynium's build step will fail."
-
   say "Installing plugins from lazy-lock.json (this takes a few minutes)"
   nvim --headless "+Lazy! restore" +qa
   say "Installing LSP servers and formatters"
