@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+# texide — an Overleaf-style LaTeX workspace in tmux.
+#
+#   texide paper.tex          editor pane on the left, PDF pane on the right
+#   texide --view paper.pdf   open or focus the PDF pane (vimtex calls this)
+#   texide --close paper.pdf  close the PDF pane (nvim calls this on quit)
+#
+# nvim/vimtex owns the compiling; this script only owns the tmux panes.
+
+set -euo pipefail
+
+viewer_width="${TEXIDE_VIEWER_WIDTH:-45%}"
+self="$(command -v texide || printf '%s' "$0")"
+
+die() {
+  printf 'texide: %s\n' "$*" >&2
+  exit 1
+}
+
+abspath() {
+  local dir
+  dir="$(cd "$(dirname "$1")" 2>/dev/null && pwd)" || die "no such directory: $(dirname "$1")"
+  printf '%s/%s\n' "$dir" "$(basename "$1")"
+}
+
+# Each viewer pane tags itself with the PDF it is showing, so reopening the
+# viewer finds the existing pane instead of stacking up duplicates.
+viewer_pane_for() {
+  tmux list-panes -s -F '#{pane_id} #{@texide_pdf}' 2>/dev/null |
+    awk -v pdf="$1" '$2 == pdf { print $1; exit }'
+}
+
+open_viewer() {
+  local pdf="$1" pane
+  [ -n "${TMUX:-}" ] || die "not inside tmux — start the workspace with: texide ${pdf%.pdf}.tex"
+
+  pane="$(viewer_pane_for "$pdf")"
+  if [ -n "$pane" ]; then
+    tmux select-pane -t "$pane"
+    return
+  fi
+
+  pane="$(tmux split-window -h -l "$viewer_width" -c "$(dirname "$pdf")" \
+    -P -F '#{pane_id}' "$self --render $pdf")"
+  tmux set-option -p -t "$pane" @texide_pdf "$pdf"
+  tmux select-pane -t "${TMUX_PANE:-}" # hand the cursor back to the editor
+}
+
+close_viewer() {
+  local pane
+  pane="$(viewer_pane_for "$1")"
+  [ -n "$pane" ] && tmux kill-pane -t "$pane"
+  return 0
+}
+
+# Runs inside the viewer pane. The PDF does not exist until the first compile
+# finishes, so wait for it before handing off to tdf.
+render() {
+  local pdf="$1" waited=0
+  while [ ! -s "$pdf" ]; do
+    [ "$waited" -lt 1200 ] || die "timed out waiting for $pdf — check the compile log"
+    sleep 0.1
+    waited=$((waited + 1))
+  done
+  exec tdf "$pdf"
+}
+
+scaffold() {
+  cat >"$1" <<'TEX'
+\documentclass[11pt]{article}
+\usepackage{amsmath, amssymb}
+\usepackage[margin=1in]{geometry}
+
+\title{Untitled}
+\author{}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\end{document}
+TEX
+}
+
+workspace() {
+  local tex pdf dir name
+  case "$1" in *.tex) ;; *) die "expected a .tex file, got $1" ;; esac
+  [ -e "$1" ] || scaffold "$1"
+  tex="$(abspath "$1")"
+  dir="$(dirname "$tex")"
+  pdf="${tex%.tex}.pdf"
+  name="$(basename "${tex%.tex}")"
+
+  # Outside tmux: build the session first, then re-enter through the branch below.
+  if [ -z "${TMUX:-}" ]; then
+    exec tmux new-session -A -s "tex-$name" -c "$dir" "$self $tex"
+  fi
+
+  tmux rename-window "$name"
+  open_viewer "$pdf"
+  exec nvim "$tex"
+}
+
+usage() { sed -n '3,7p' "$0" | sed 's/^#\{1,\} \{0,1\}//'; }
+
+case "${1:-}" in
+  --view) [ $# -eq 2 ] || die "usage: texide --view <file.pdf>"; open_viewer "$(abspath "$2")" ;;
+  --close) [ $# -eq 2 ] || die "usage: texide --close <file.pdf>"; close_viewer "$(abspath "$2")" ;;
+  --render) [ $# -eq 2 ] || die "usage: texide --render <file.pdf>"; render "$2" ;;
+  -h | --help | "") usage ;;
+  *) workspace "$1" ;;
+esac
