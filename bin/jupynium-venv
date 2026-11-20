@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# jupynium-venv — build the Python environment that jupynium.nvim drives.
+#
+#   jupynium-venv [plugin-dir]
+#
+# lazy.nvim runs this as jupynium.nvim's `build` step, from the plugin's own
+# directory. Run it by hand with no argument to repair just the Jupyter side.
+#
+# The Python half of Jupynium is a real package, not a bundled script, so it
+# has to be installed somewhere. It gets a dedicated venv rather than the
+# system interpreter: Arch marks that one externally-managed (PEP 668) and pip
+# refuses to write to it. Every step is idempotent — reinstalling in place is
+# how plugin updates land.
+
+set -euo pipefail
+
+venv="${JUPYNIUM_VENV:-$HOME/.virtualenvs/jupynium}"
+plugin_dir="${1:-$PWD}"
+
+# notebook and nbclassic trail the newest CPython by a release or two, so pin
+# the interpreter here instead of inheriting whatever the system ships.
+python_version="${JUPYNIUM_PYTHON_VERSION:-3.12}"
+
+command -v uv >/dev/null || {
+  printf 'jupynium-venv: uv is not installed\n' >&2
+  exit 1
+}
+
+[ -x "$venv/bin/python" ] || uv venv --python "$python_version" "$venv"
+
+# nbclassic is the pre-7 Notebook UI. Jupynium drives it through Selenium and
+# does not support Notebook 7, so the classic interface is a requirement, not
+# a preference. pynvim is what the Python side talks back to Neovim with.
+uv pip install --quiet --python "$venv/bin/python" \
+  notebook nbclassic jupyter-console pynvim
+
+# The plugin ships its own pyproject.toml; skip this when invoked by hand
+# outside the plugin directory.
+if [ -f "$plugin_dir/pyproject.toml" ]; then
+  uv pip install --quiet --python "$venv/bin/python" "$plugin_dir"
+fi
+
+printf 'jupynium-venv: ready at %s\n' "$venv"
